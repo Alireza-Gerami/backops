@@ -1,0 +1,31 @@
+
+name: React.js CI/CD
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+jobs:
+  deploy-to-stage:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Node.Js v18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+    - name: Install npm modules
+      run: npm ci
+    - name: Build react.js app
+      run: CI=false npm run build
+    - name: Install SSH
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        known_hosts: 'empty'
+    - name: Add Known Hosts
+      run: ssh-keyscan -H ${{ secrets.SSH_HOST }}  >> ~/.ssh/known_hosts
+    - name: Deploy with rsync
+      run: rsync -avz -e "ssh -p ${{ secrets.SSH_PORT }}" ./build/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/project/public
