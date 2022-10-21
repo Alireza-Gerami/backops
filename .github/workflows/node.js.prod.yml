@@ -1,0 +1,41 @@
+name: Node.js CI/CD
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy-to-production:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Node.Js v18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+    - name: Install npm modules
+      run: npm ci
+    - name: Install SSH
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        known_hosts: 'empty'
+    - name: Add Known Hosts
+      run: ssh-keyscan -H ${{ secrets.SSH_HOST }}  >> ~/.ssh/known_hosts
+    - name: Deploy to server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: |
+          cd /home/project
+          git checkout ${{ github.ref_name }}
+          git stash
+          git pull origin ${{ github.ref_name }}
+          npm install
+          pm2 restart 0-prod-domain.com
+          exit
